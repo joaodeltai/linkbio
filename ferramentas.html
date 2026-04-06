@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Links & Ferramentas — João Quintana</title>
+  <meta name="description" content="Ferramentas que eu uso e recomendo.">
+  <meta property="og:title" content="Links & Ferramentas — João Quintana">
+  <meta property="og:description" content="Ferramentas que eu uso e recomendo.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* ========== RESET & BASE ========== */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0a0a0a;
+      color: #ffffff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ========== CONTAINER ========== */
+    .container {
+      width: 100%;
+      max-width: 420px;
+      padding: 40px 20px 32px;
+      margin: 0 auto;
+    }
+
+    /* ========== ANIMAÇÕES ========== */
+    @keyframes fadeSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-in {
+      opacity: 0;
+      animation: fadeSlideUp 0.5s ease-out forwards;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .animate-in {
+        animation: none;
+        opacity: 1;
+      }
+      .tool-card {
+        transition: none !important;
+      }
+    }
+
+    /* ========== HEADER ========== */
+    .page-header {
+      margin-bottom: 32px;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #a1a1aa;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 400;
+      margin-bottom: 24px;
+      transition: color 0.3s ease;
+      min-height: 44px;
+    }
+
+    .back-link:hover {
+      color: #3b82f6;
+    }
+
+    .back-link:focus-visible {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+
+    .page-header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .page-header .subtitle {
+      font-size: 14px;
+      color: #a1a1aa;
+      font-weight: 400;
+    }
+
+    /* ========== LISTA DE FERRAMENTAS ========== */
+    .tools-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .tool-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: #111111;
+      border: 1px solid #1e1e1e;
+      border-radius: 12px;
+      padding: 20px;
+      text-decoration: none;
+      color: #ffffff;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+    }
+
+    .tool-card:hover {
+      border-color: #3b82f6;
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.15);
+      transform: scale(1.02);
+    }
+
+    .tool-card:focus-visible {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+
+    .tool-card__icon {
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      background: #1a1a2e;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .tool-card__content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .tool-card__title {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .tool-card__desc {
+      font-size: 12px;
+      color: #a1a1aa;
+      line-height: 1.5;
+    }
+
+    /* ========== RESPONSIVIDADE ========== */
+    @media (min-width: 1024px) {
+      .container {
+        padding: 48px 24px 40px;
+      }
+    }
+
+    /* ========== FOOTER ========== */
+    footer {
+      text-align: center;
+      padding: 16px 20px 32px;
+      font-size: 11px;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="page-header animate-in" style="animation-delay: 0.1s">
+      <a href="index.html" class="back-link" aria-label="Voltar para página principal">← Voltar</a>
+      <h1>Links & Ferramentas</h1>
+      <p class="subtitle">Ferramentas que eu uso e recomendo.</p>
+    </header>
+
+    <main>
+      <div class="tools-list" id="cards-container"></div>
+    </main>
+
+    <script>
+      const API = 'https://bqbijrcdbhgbdznlqdlu.supabase.co/functions/v1';
+      const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJxYmlqcmNkYmhnYmR6bmxxZGx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MzU1NzgsImV4cCI6MjA5MTAxMTU3OH0.WVn_DcR7RcBZiwITo_JJpqdyQ5iKeBKomn65nzqC3Yg';
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      (async () => {
+        const container = document.getElementById('cards-container');
+        try {
+          const res = await fetch(`${API}/get-cards?page=ferramentas`, { headers: { 'Authorization': `Bearer ${KEY}` } });
+          if (!res.ok) { container.innerHTML = '<p style="color:#a1a1aa;font-size:13px;text-align:center;padding:40px 0;">Erro ao carregar ferramentas.</p>'; return; }
+          const cards = await res.json();
+          container.innerHTML = cards.map((c, i) => `
+            <a href="${escapeHtml(c.url) || '#'}" target="_blank" rel="noopener noreferrer" class="tool-card animate-in" style="animation-delay:${0.3 + i * 0.1}s">
+              <div class="tool-card__icon">${escapeHtml(c.icon) || '🔧'}</div>
+              <div class="tool-card__content">
+                <h2 class="tool-card__title">${escapeHtml(c.title)}</h2>
+                <p class="tool-card__desc">${escapeHtml(c.description)}</p>
+              </div>
+            </a>
+          `).join('');
+        } catch {
+          container.innerHTML = '<p style="color:#a1a1aa;font-size:13px;text-align:center;padding:40px 0;">Erro ao carregar ferramentas.</p>';
+        }
+      })();
+    </script>
+
+    <footer>
+      <p>&copy; 2026 João Quintana. Feito com ☕ e código.</p>
+    </footer>
+  </div>
+</body>
+</html>
