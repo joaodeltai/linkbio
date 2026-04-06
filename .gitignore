@@ -1,1 +1,4 @@
 .vercel
+.DS_Store
+supabase/.temp/
+node_modules/
