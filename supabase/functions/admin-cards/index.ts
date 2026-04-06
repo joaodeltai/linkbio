@@ -18,6 +18,32 @@ function base64urlDecode(str: string): Uint8Array {
   return Uint8Array.from(bin, c => c.charCodeAt(0));
 }
 
+const VALID_PAGES = ["index", "projetos", "prompts", "ferramentas"];
+const VALID_LINK_TYPES = ["external", "internal", "gated"];
+const VALID_STATUSES = ["active", "soon", "beta", ""];
+const VALID_HIGHLIGHTS = ["orange", ""];
+
+function isValidUrl(url: string): boolean {
+  if (!url) return true;
+  try {
+    const parsed = new URL(url);
+    return ["http:", "https:", "mailto:", "tel:"].includes(parsed.protocol);
+  } catch {
+    // Allow relative URLs (e.g. "projetos.html")
+    return !url.includes(":") || url.startsWith("/");
+  }
+}
+
+function validateCardBody(body: Record<string, unknown>): string | null {
+  if (!body.title || typeof body.title !== "string") return "Título é obrigatório";
+  if (!body.page || !VALID_PAGES.includes(body.page as string)) return "Página inválida";
+  if (body.link_type && !VALID_LINK_TYPES.includes(body.link_type as string)) return "Tipo de link inválido";
+  if (body.status && !VALID_STATUSES.includes(body.status as string)) return "Status inválido";
+  if (body.highlight && !VALID_HIGHLIGHTS.includes(body.highlight as string)) return "Destaque inválido";
+  if (body.url && !isValidUrl(body.url as string)) return "URL inválida — protocolos permitidos: http, https, mailto, tel";
+  return null;
+}
+
 async function verifyToken(req: Request): Promise<boolean> {
   try {
     const token = req.headers.get("X-Admin-Token");
@@ -83,6 +109,12 @@ Deno.serve(async (req) => {
 
     if (req.method === "POST") {
       const body = await req.json();
+      const validationError = validateCardBody(body);
+      if (validationError) {
+        return new Response(JSON.stringify({ error: validationError }), {
+          status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
       const { data, error } = await supabase.from("cards").insert({
         page: body.page, icon: body.icon || null, title: body.title,
         description: body.description || null, url: body.url || null,
@@ -100,6 +132,12 @@ Deno.serve(async (req) => {
       const body = await req.json();
       if (!body.id) {
         return new Response(JSON.stringify({ error: "ID é obrigatório" }), {
+          status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+      const validationError = validateCardBody(body);
+      if (validationError) {
+        return new Response(JSON.stringify({ error: validationError }), {
           status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
         });
       }
