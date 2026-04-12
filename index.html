@@ -11,7 +11,8 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://bqbijrcdbhgbdznlqdlu.supabase.co">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" media="print" onload="this.media='all'">
   <style>
     /* ========== RESET & BASE ========== */
     *, *::before, *::after {
@@ -57,12 +58,8 @@
     }
 
     @keyframes pulseGlowOrange {
-      0%, 100% {
-        box-shadow: 0 0 8px rgba(249, 115, 22, 0.15), inset 0 0 8px rgba(249, 115, 22, 0.05);
-      }
-      50% {
-        box-shadow: 0 0 16px rgba(249, 115, 22, 0.3), inset 0 0 12px rgba(249, 115, 22, 0.08);
-      }
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
     }
 
     @keyframes modalIn {
@@ -194,8 +191,9 @@
       text-decoration: none;
       font-family: inherit;
       cursor: pointer;
-      transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease, background 0.3s ease;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.15s ease;
       text-align: left;
+      contain: content;
     }
 
     .link-card:hover {
@@ -239,10 +237,25 @@
     .link-card--orange {
       border-color: #f97316;
       box-shadow: 0 0 8px rgba(249, 115, 22, 0.15), inset 0 0 8px rgba(249, 115, 22, 0.05);
+      position: relative;
+    }
+
+    .link-card--orange::after {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      box-shadow: 0 0 16px rgba(249, 115, 22, 0.3), inset 0 0 12px rgba(249, 115, 22, 0.08);
+      pointer-events: none;
+      will-change: opacity;
     }
 
     .link-card--orange.animate-in {
-      animation: fadeSlideUp 0.5s ease-out forwards, pulseGlowOrange 3s ease-in-out 0.5s infinite;
+      animation: fadeSlideUp 0.5s ease-out forwards;
+    }
+
+    .link-card--orange.animate-in::after {
+      animation: pulseGlowOrange 3s ease-in-out 0.5s infinite;
     }
 
     .link-card--orange:hover {
@@ -363,8 +376,6 @@
       position: fixed;
       inset: 0;
       background: rgba(0, 0, 0, 0.8);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
       z-index: 1000;
       align-items: center;
       justify-content: center;
@@ -373,6 +384,8 @@
 
     .modal-overlay.active {
       display: flex;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
     }
 
     .modal {
@@ -475,6 +488,7 @@
         class="avatar"
         width="96"
         height="96"
+        fetchpriority="high"
       >
       <h1>João Quintana</h1>
       <p class="bio">Desenvolvedor, criador de conteúdo e construtor de SaaS.</p>
@@ -573,27 +587,11 @@
       }
     }
 
-    async function apiCheckLead(email) {
-      try {
-        const res = await fetch(`${API_BASE_URL}/check-lead?email=${encodeURIComponent(email)}`, {
-          headers: {
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-          }
-        });
-        if (!res.ok) return false;
-        const { exists } = await res.json();
-        return exists;
-      } catch {
-        return false;
-      }
-    }
-
     // ========== SEGURANÇA ==========
+    const _escMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
     function escapeHtml(str) {
       if (!str) return '';
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
+      return String(str).replace(/[&<>"']/g, c => _escMap[c]);
     }
 
     // ========== CARREGAR CARDS DINAMICAMENTE ==========

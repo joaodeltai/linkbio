@@ -10,7 +10,8 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://bqbijrcdbhgbdznlqdlu.supabase.co">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" media="print" onload="this.media='all'">
   <style>
     /* ========== RESET & BASE ========== */
     *, *::before, *::after {
@@ -199,11 +200,10 @@
       const API = 'https://bqbijrcdbhgbdznlqdlu.supabase.co/functions/v1';
       const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJxYmlqcmNkYmhnYmR6bmxxZGx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MzU1NzgsImV4cCI6MjA5MTAxMTU3OH0.WVn_DcR7RcBZiwITo_JJpqdyQ5iKeBKomn65nzqC3Yg';
 
+      const _escMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
       function escapeHtml(str) {
         if (!str) return '';
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        return String(str).replace(/[&<>"']/g, c => _escMap[c]);
       }
 
       (async () => {
