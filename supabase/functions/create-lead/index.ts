@@ -38,36 +38,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validação de telefone brasileiro (quando informado)
+    // Validação básica de telefone (E.164: 7-15 dígitos, quando informado)
     if (whatsapp) {
       const digits = whatsapp.replace(/\D/g, "");
-      // Formato básico: 11 dígitos (DDD + 9 + 8) ou 13 dígitos (55 + DDD + 9 + 8)
-      const phoneRegex = /^(?:55)?([1-9][1-9])(9\d{8})$/;
-      if (!phoneRegex.test(digits)) {
+      if (digits.length < 7 || digits.length > 15) {
         return new Response(
-          JSON.stringify({ error: "Número de WhatsApp inválido. Use o formato (DD) 9XXXX-XXXX." }),
+          JSON.stringify({ error: "Número de telefone inválido." }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
-      }
-
-      // Validação real via numverify
-      const fullNumber = digits.length === 11 ? `55${digits}` : digits;
-      try {
-        const nvRes = await fetch(
-          `https://api.apilayer.com/number_verification/validate?number=${fullNumber}`,
-          { headers: { "apikey": Deno.env.get("NUMVERIFY_API_KEY")! } }
-        );
-        if (nvRes.ok) {
-          const nvData = await nvRes.json();
-          if (!nvData.valid) {
-            return new Response(
-              JSON.stringify({ error: "Número de WhatsApp não existe. Verifique e tente novamente." }),
-              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-          }
-        }
-      } catch {
-        // Se numverify falhar, permite seguir (fallback gracioso)
       }
     }
 

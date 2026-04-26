@@ -462,6 +462,40 @@
       border-color: #3b82f6;
     }
 
+    /* ========== PHONE INPUT (country selector + numero) ========== */
+    .phone-input-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    .phone-input-group__select {
+      flex: 0 0 110px;
+      padding: 12px 8px;
+      background: #0a0a0a;
+      border: 1px solid #1e1e1e;
+      border-radius: 8px;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23888' d='M0 0l5 6 5-6z'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      padding-right: 22px;
+    }
+
+    .phone-input-group__select:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    .phone-input-group__input {
+      flex: 1;
+      min-width: 0;
+    }
+
     /* ========== FOOTER ========== */
     footer {
       text-align: center;
@@ -533,7 +567,10 @@
         <form class="the-claw__form" id="claw-form">
           <input type="text" name="name" placeholder="Seu nome" required aria-label="Seu nome">
           <input type="email" name="email" placeholder="Seu melhor e-mail" required aria-label="Seu melhor e-mail">
-          <input type="tel" name="whatsapp" placeholder="(00) 00000-0000" required aria-label="Seu WhatsApp">
+          <div class="phone-input-group">
+            <select name="dial_code" class="phone-input-group__select" aria-label="Código do país" required></select>
+            <input type="tel" name="whatsapp" placeholder="(00) 00000-0000" required aria-label="Seu WhatsApp" class="phone-input-group__input">
+          </div>
           <button type="submit" class="btn-primary">Quero entrar →</button>
           <div class="form-message" id="claw-message"></div>
         </form>
@@ -555,7 +592,10 @@
       <form class="modal__form" id="modal-form">
         <input type="text" name="name" placeholder="Seu nome" required aria-label="Seu nome">
         <input type="email" name="email" placeholder="Seu melhor e-mail" required aria-label="Seu e-mail">
-        <input type="tel" name="whatsapp" placeholder="(00) 00000-0000" required aria-label="Seu WhatsApp">
+        <div class="phone-input-group">
+          <select name="dial_code" class="phone-input-group__select" aria-label="Código do país" required></select>
+          <input type="tel" name="whatsapp" placeholder="(00) 00000-0000" required aria-label="Seu WhatsApp" class="phone-input-group__input">
+        </div>
         <button type="submit" class="btn-primary" id="modal-submit">Liberar acesso →</button>
         <div class="form-message" id="modal-message"></div>
         <p class="legal-text">Seus dados estão seguros. Sem spam.</p>
@@ -567,6 +607,66 @@
     // ⚠️ CONFIGURAR AQUI
     const API_BASE_URL = 'https://bqbijrcdbhgbdznlqdlu.supabase.co/functions/v1';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJxYmlqcmNkYmhnYmR6bmxxZGx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MzU1NzgsImV4cCI6MjA5MTAxMTU3OH0.WVn_DcR7RcBZiwITo_JJpqdyQ5iKeBKomn65nzqC3Yg';
+
+    // ========== COUNTRY DIAL CODES ==========
+    // BR primeiro (default), depois lista alfabética
+    const COUNTRY_CODES = [
+      { dial: '55',  flag: '🇧🇷', name: 'Brasil' },
+      { dial: '54',  flag: '🇦🇷', name: 'Argentina' },
+      { dial: '61',  flag: '🇦🇺', name: 'Austrália' },
+      { dial: '32',  flag: '🇧🇪', name: 'Bélgica' },
+      { dial: '591', flag: '🇧🇴', name: 'Bolívia' },
+      { dial: '1',   flag: '🇨🇦', name: 'Canadá' },
+      { dial: '56',  flag: '🇨🇱', name: 'Chile' },
+      { dial: '86',  flag: '🇨🇳', name: 'China' },
+      { dial: '57',  flag: '🇨🇴', name: 'Colômbia' },
+      { dial: '506', flag: '🇨🇷', name: 'Costa Rica' },
+      { dial: '53',  flag: '🇨🇺', name: 'Cuba' },
+      { dial: '593', flag: '🇪🇨', name: 'Equador' },
+      { dial: '34',  flag: '🇪🇸', name: 'Espanha' },
+      { dial: '1',   flag: '🇺🇸', name: 'Estados Unidos' },
+      { dial: '33',  flag: '🇫🇷', name: 'França' },
+      { dial: '49',  flag: '🇩🇪', name: 'Alemanha' },
+      { dial: '502', flag: '🇬🇹', name: 'Guatemala' },
+      { dial: '504', flag: '🇭🇳', name: 'Honduras' },
+      { dial: '91',  flag: '🇮🇳', name: 'Índia' },
+      { dial: '353', flag: '🇮🇪', name: 'Irlanda' },
+      { dial: '39',  flag: '🇮🇹', name: 'Itália' },
+      { dial: '81',  flag: '🇯🇵', name: 'Japão' },
+      { dial: '52',  flag: '🇲🇽', name: 'México' },
+      { dial: '505', flag: '🇳🇮', name: 'Nicarágua' },
+      { dial: '47',  flag: '🇳🇴', name: 'Noruega' },
+      { dial: '64',  flag: '🇳🇿', name: 'Nova Zelândia' },
+      { dial: '31',  flag: '🇳🇱', name: 'Países Baixos' },
+      { dial: '507', flag: '🇵🇦', name: 'Panamá' },
+      { dial: '595', flag: '🇵🇾', name: 'Paraguai' },
+      { dial: '51',  flag: '🇵🇪', name: 'Peru' },
+      { dial: '351', flag: '🇵🇹', name: 'Portugal' },
+      { dial: '44',  flag: '🇬🇧', name: 'Reino Unido' },
+      { dial: '1',   flag: '🇩🇴', name: 'República Dominicana' },
+      { dial: '503', flag: '🇸🇻', name: 'El Salvador' },
+      { dial: '46',  flag: '🇸🇪', name: 'Suécia' },
+      { dial: '41',  flag: '🇨🇭', name: 'Suíça' },
+      { dial: '598', flag: '🇺🇾', name: 'Uruguai' },
+      { dial: '58',  flag: '🇻🇪', name: 'Venezuela' },
+    ];
+
+    function populatePhoneSelects() {
+      const opts = COUNTRY_CODES.map((c, i) =>
+        `<option value="${c.dial}"${i === 0 ? ' selected' : ''}>${c.flag} +${c.dial}</option>`
+      ).join('');
+      document.querySelectorAll('select[name="dial_code"]').forEach(sel => {
+        sel.innerHTML = opts;
+        sel.value = '55';
+      });
+    }
+    populatePhoneSelects();
+
+    function buildE164(dial, raw) {
+      const digits = (raw || '').replace(/\D/g, '');
+      if (!digits) return '';
+      return `+${dial}${digits}`;
+    }
 
     // ========== API HELPERS ==========
     async function apiCreateLead(data) {
@@ -697,7 +797,7 @@
       const data = {
         name: formData.get('name').trim(),
         email: formData.get('email').trim(),
-        whatsapp: formData.get('whatsapp').trim(),
+        whatsapp: buildE164(formData.get('dial_code'), formData.get('whatsapp')),
         source: modalForm.dataset.source || 'unknown'
       };
 
@@ -743,7 +843,7 @@
       const data = {
         name: formData.get('name').trim(),
         email: formData.get('email').trim(),
-        whatsapp: formData.get('whatsapp').trim(),
+        whatsapp: buildE164(formData.get('dial_code'), formData.get('whatsapp')),
         source: 'the-claw'
       };
 
