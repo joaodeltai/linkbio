@@ -6,6 +6,25 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const VALID_SOURCES = ["prompts", "ferramentas", "the-claw"];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function jsonResponse(body: Record<string, unknown>, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function readJsonObject(req: Request): Promise<Record<string, unknown> | null> {
+  try {
+    const body = await req.json();
+    return body && typeof body === "object" && !Array.isArray(body) ? body : null;
+  } catch {
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   // CORS preflight
   if (req.method === "OPTIONS") {
@@ -13,59 +32,64 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
   try {
-    const { name, email, whatsapp, source } = await req.json();
+    const body = await readJsonObject(req);
+    if (!body) return jsonResponse({ error: "JSON inválido" }, 400);
+
+    const { name, email, whatsapp, source } = body;
 
     // Validação
-    if (!name || !email || !source) {
-      return new Response(
-        JSON.stringify({ error: "Campos name, email e source são obrigatórios" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (typeof name !== "string" || typeof email !== "string" || typeof source !== "string") {
+      return jsonResponse({ error: "Campos name, email e source são obrigatórios" }, 400);
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return new Response(
-        JSON.stringify({ error: "Email inválido" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const cleanedName = name.trim();
+    const cleanedEmail = email.trim().toLowerCase();
+    const cleanedSource = source.trim();
+    const cleanedWhatsapp = typeof whatsapp === "string" ? whatsapp.trim() : "";
+
+    if (!cleanedName || cleanedName.length > 120) {
+      return jsonResponse({ error: "Nome inválido" }, 400);
+    }
+
+    if (!EMAIL_RE.test(cleanedEmail) || cleanedEmail.length > 254) {
+      return jsonResponse({ error: "Email inválido" }, 400);
+    }
+
+    if (!VALID_SOURCES.includes(cleanedSource)) {
+      return jsonResponse({ error: "Origem inválida" }, 400);
     }
 
     // Validação básica de telefone (E.164: 7-15 dígitos, quando informado)
-    if (whatsapp) {
-      const digits = whatsapp.replace(/\D/g, "");
+    if (cleanedWhatsapp) {
+      const digits = cleanedWhatsapp.replace(/\D/g, "");
       if (digits.length < 7 || digits.length > 15) {
-        return new Response(
-          JSON.stringify({ error: "Número de telefone inválido." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ error: "Número de telefone inválido." }, 400);
       }
+    } else if (whatsapp != null) {
+      return jsonResponse({ error: "Número de telefone inválido." }, 400);
     }
 
     // Validação do domínio via UserCheck
-    const domain = email.trim().toLowerCase().split("@")[1];
-    try {
-      const ucRes = await fetch(`https://api.usercheck.com/domain/${domain}`, {
-        headers: { "Authorization": `Bearer ${Deno.env.get("USERCHECK_API_KEY")}` }
-      });
-      if (ucRes.ok) {
-        const ucData = await ucRes.json();
-        if (ucData.disposable || !ucData.mx) {
-          return new Response(
-            JSON.stringify({ error: "Por favor, use um email válido (não temporário)." }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+    const usercheckKey = Deno.env.get("USERCHECK_API_KEY");
+    if (usercheckKey) {
+      const domain = cleanedEmail.split("@")[1];
+      try {
+        const ucRes = await fetch(`https://api.usercheck.com/domain/${domain}`, {
+          headers: { "Authorization": `Bearer ${usercheckKey}` }
+        });
+        if (ucRes.ok) {
+          const ucData = await ucRes.json();
+          if (ucData.disposable || !ucData.mx) {
+            return jsonResponse({ error: "Por favor, use um email válido (não temporário)." }, 400);
+          }
         }
+      } catch {
+        // Se UserCheck falhar, permite seguir (fallback gracioso)
       }
-    } catch {
-      // Se UserCheck falhar, permite seguir (fallback gracioso)
     }
 
     // Supabase client com service_role (server-side)
@@ -75,27 +99,18 @@ Deno.serve(async (req) => {
     );
 
     const { error } = await supabase.from("leads").insert({
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      whatsapp: whatsapp?.trim() || null,
-      source,
+      name: cleanedName,
+      email: cleanedEmail,
+      whatsapp: cleanedWhatsapp || null,
+      source: cleanedSource,
     });
 
     if (error) {
-      return new Response(
-        JSON.stringify({ error: "Erro ao salvar lead" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Erro ao salvar lead" }, 500);
     }
 
-    return new Response(
-      JSON.stringify({ success: true }),
-      { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ success: true }, 201);
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Erro interno" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: "Erro interno" }, 500);
   }
 });

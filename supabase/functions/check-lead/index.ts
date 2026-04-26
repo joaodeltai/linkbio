@@ -6,6 +6,13 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
+function jsonResponse(body: Record<string, unknown>, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req) => {
   // CORS preflight
   if (req.method === "OPTIONS") {
@@ -13,10 +20,7 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== "GET") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
   try {
@@ -24,10 +28,13 @@ Deno.serve(async (req) => {
     const email = url.searchParams.get("email");
 
     if (!email) {
-      return new Response(
-        JSON.stringify({ error: "Parâmetro email é obrigatório" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Parâmetro email é obrigatório" }, 400);
+    }
+
+    const cleanedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanedEmail) || cleanedEmail.length > 254) {
+      return jsonResponse({ error: "Email inválido" }, 400);
     }
 
     // Supabase client com service_role (server-side)
@@ -39,24 +46,15 @@ Deno.serve(async (req) => {
     const { data, error } = await supabase
       .from("leads")
       .select("id")
-      .eq("email", email.trim().toLowerCase())
+      .eq("email", cleanedEmail)
       .limit(1);
 
     if (error) {
-      return new Response(
-        JSON.stringify({ error: "Erro ao consultar" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Erro ao consultar" }, 500);
     }
 
-    return new Response(
-      JSON.stringify({ exists: data.length > 0 }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ exists: data.length > 0 }, 200);
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Erro interno" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: "Erro interno" }, 500);
   }
 });

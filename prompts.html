@@ -164,6 +164,23 @@
       color: #555;
     }
   </style>
+  <!-- Meta Pixel Code -->
+  <script>
+  !function(f,b,e,v,n,t,s)
+  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+  n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];
+  s.parentNode.insertBefore(t,s)}(window, document,'script',
+  'https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init', '845238927913649');
+  fbq('track', 'PageView');
+  </script>
+  <noscript><img height="1" width="1" style="display:none"
+  src="https://www.facebook.com/tr?id=845238927913649&ev=PageView&noscript=1"
+  /></noscript>
+  <!-- End Meta Pixel Code -->
 </head>
 <body>
   <div class="container">
@@ -187,18 +204,32 @@
         return String(str).replace(/[&<>"']/g, c => _escMap[c]);
       }
 
+      function safeHref(url) {
+        const value = String(url || '').trim();
+        if (!value || value.startsWith('//')) return '#';
+        try {
+          const parsed = new URL(value, window.location.origin);
+          return ['http:', 'https:', 'mailto:', 'tel:'].includes(parsed.protocol) ? value : '#';
+        } catch {
+          return '#';
+        }
+      }
+
       (async () => {
         const container = document.getElementById('cards-container');
         try {
           const res = await fetch(`${API}/get-cards?page=prompts`, { headers: { 'Authorization': `Bearer ${KEY}` } });
           if (!res.ok) { container.innerHTML = '<p style="color:#a1a1aa;font-size:13px;text-align:center;padding:40px 0;">Erro ao carregar prompts.</p>'; return; }
           const cards = await res.json();
-          container.innerHTML = cards.map((c, i) => `
-            <a href="${escapeHtml(c.url) || '#'}" ${c.url && c.url !== '#' ? 'target="_blank" rel="noopener noreferrer"' : ''} class="prompt-card animate-in" style="animation-delay:${0.3 + i * 0.1}s">
+          container.innerHTML = cards.map((c, i) => {
+            const href = safeHref(c.url);
+            return `
+            <a href="${escapeHtml(href)}" ${href !== '#' && c.link_type !== 'internal' ? 'target="_blank" rel="noopener noreferrer"' : ''} class="prompt-card animate-in" style="animation-delay:${0.3 + i * 0.1}s">
               <h2 class="prompt-card__title">${escapeHtml(c.title)}</h2>
               <p class="prompt-card__desc">${escapeHtml(c.description)}</p>
             </a>
-          `).join('');
+          `;
+          }).join('');
         } catch {
           container.innerHTML = '<p style="color:#a1a1aa;font-size:13px;text-align:center;padding:40px 0;">Erro ao carregar prompts.</p>';
         }

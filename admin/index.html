@@ -453,11 +453,13 @@
     // ========== CARDS ==========
     async function loadCards() {
       try {
-        const res = await fetch(`${API_BASE_URL}/admin-cards?page=${currentPage}`, {
+        const res = await fetch(`${API_BASE_URL}/admin-cards?page=${encodeURIComponent(currentPage)}`, {
           headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'X-Admin-Token': getToken() }
         });
         if (res.status === 401) { clearToken(); showView('login'); return; }
+        if (!res.ok) throw new Error('load failed');
         cards = await res.json();
+        if (!Array.isArray(cards)) throw new Error('invalid response');
         renderCards();
       } catch {
         document.getElementById('cards-list').innerHTML = '<p style="color:#ef4444;font-size:13px">Erro ao carregar cards.</p>';
@@ -542,11 +544,12 @@
     window.deleteCard = async function(id) {
       if (!confirm('Tem certeza que deseja excluir este card?')) return;
       try {
-        await fetch(`${API_BASE_URL}/admin-cards`, {
+        const res = await fetch(`${API_BASE_URL}/admin-cards`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'X-Admin-Token': getToken() },
           body: JSON.stringify({ id })
         });
+        if (!res.ok) { alert('Erro ao excluir'); return; }
         loadCards();
       } catch { alert('Erro ao excluir'); }
     };

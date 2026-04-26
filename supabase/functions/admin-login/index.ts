@@ -11,6 +11,22 @@ function getCorsHeaders(req: Request) {
   };
 }
 
+function jsonResponse(req: Request, body: Record<string, unknown>, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+  });
+}
+
+async function readJsonObject(req: Request): Promise<Record<string, unknown> | null> {
+  try {
+    const body = await req.json();
+    return body && typeof body === "object" && !Array.isArray(body) ? body : null;
+  } catch {
+    return null;
+  }
+}
+
 // Hash SHA-256 simples (sem bcrypt, sem dependências extras)
 async function sha256(text: string): Promise<string> {
   const data = new TextEncoder().encode(text);
@@ -49,19 +65,17 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
-    });
+    return jsonResponse(req, { error: "Method not allowed" }, 405);
   }
 
   try {
-    const { username, password } = await req.json();
+    const body = await readJsonObject(req);
+    if (!body) return jsonResponse(req, { error: "JSON inválido" }, 400);
 
-    if (!username || !password) {
-      return new Response(
-        JSON.stringify({ error: "Username e password são obrigatórios" }),
-        { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
-      );
+    const { username, password } = body;
+
+    if (typeof username !== "string" || typeof password !== "string" || !username.trim() || !password) {
+      return jsonResponse(req, { error: "Username e password são obrigatórios" }, 400);
     }
 
     const supabase = createClient(
@@ -76,26 +90,17 @@ Deno.serve(async (req) => {
       .single();
 
     if (error || !user) {
-      return new Response(
-        JSON.stringify({ error: "Credenciais inválidas" }),
-        { status: 401, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
-      );
+      return jsonResponse(req, { error: "Credenciais inválidas" }, 401);
     }
 
     const passwordHash = await sha256(password);
     if (passwordHash !== user.password_hash) {
-      return new Response(
-        JSON.stringify({ error: "Credenciais inválidas" }),
-        { status: 401, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
-      );
+      return jsonResponse(req, { error: "Credenciais inválidas" }, 401);
     }
 
     const secret = Deno.env.get("ADMIN_JWT_SECRET");
     if (!secret) {
-      return new Response(
-        JSON.stringify({ error: "Erro de configuração do servidor" }),
-        { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
-      );
+      return jsonResponse(req, { error: "Erro de configuração do servidor" }, 500);
     }
     const now = Math.floor(Date.now() / 1000);
     const token = await createJWT(
@@ -103,14 +108,8 @@ Deno.serve(async (req) => {
       secret
     );
 
-    return new Response(
-      JSON.stringify({ token, username: user.username }),
-      { status: 200, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
-    );
+    return jsonResponse(req, { token, username: user.username }, 200);
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Erro interno" }),
-      { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
-    );
+    return jsonResponse(req, { error: "Erro interno" }, 500);
   }
 });

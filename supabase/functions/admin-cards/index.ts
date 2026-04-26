@@ -21,27 +21,58 @@ function base64urlDecode(str: string): Uint8Array {
 const VALID_PAGES = ["index", "projetos", "prompts", "ferramentas"];
 const VALID_LINK_TYPES = ["external", "internal", "gated"];
 const VALID_STATUSES = ["active", "soon", "beta", ""];
-const VALID_HIGHLIGHTS = ["orange", ""];
+const VALID_HIGHLIGHTS = ["orange", "blue", ""];
+
+function jsonResponse(req: Request, body: Record<string, unknown>, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+  });
+}
+
+async function readJsonObject(req: Request): Promise<Record<string, unknown> | null> {
+  try {
+    const body = await req.json();
+    return body && typeof body === "object" && !Array.isArray(body) ? body : null;
+  } catch {
+    return null;
+  }
+}
 
 function isValidUrl(url: string): boolean {
   if (!url) return true;
+  if (url.startsWith("//")) return false;
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(url, "https://joaoquintana.dev");
     return ["http:", "https:", "mailto:", "tel:"].includes(parsed.protocol);
   } catch {
     // Allow relative URLs (e.g. "projetos.html")
-    return !url.includes(":") || url.startsWith("/");
+    return !url.includes(":") && !url.startsWith("//");
   }
 }
 
 function validateCardBody(body: Record<string, unknown>): string | null {
-  if (!body.title || typeof body.title !== "string") return "Título é obrigatório";
-  if (!body.page || !VALID_PAGES.includes(body.page as string)) return "Página inválida";
-  if (body.link_type && !VALID_LINK_TYPES.includes(body.link_type as string)) return "Tipo de link inválido";
-  if (body.status && !VALID_STATUSES.includes(body.status as string)) return "Status inválido";
-  if (body.highlight && !VALID_HIGHLIGHTS.includes(body.highlight as string)) return "Destaque inválido";
-  if (body.url && !isValidUrl(body.url as string)) return "URL inválida — protocolos permitidos: http, https, mailto, tel";
+  if (typeof body.title !== "string" || !body.title.trim() || body.title.length > 160) return "Título é obrigatório";
+  if (typeof body.page !== "string" || !VALID_PAGES.includes(body.page)) return "Página inválida";
+  if (body.icon != null && typeof body.icon !== "string") return "Ícone inválido";
+  if (body.description != null && typeof body.description !== "string") return "Descrição inválida";
+  if (body.url != null && typeof body.url !== "string") return "URL inválida";
+  if (body.link_type != null && !VALID_LINK_TYPES.includes(body.link_type as string)) return "Tipo de link inválido";
+  if (body.gate_source != null && body.gate_source !== "" && !VALID_PAGES.includes(body.gate_source as string)) return "Gate source inválido";
+  if (body.status != null && !VALID_STATUSES.includes(body.status as string)) return "Status inválido";
+  if (body.highlight != null && !VALID_HIGHLIGHTS.includes(body.highlight as string)) return "Destaque inválido";
+  if (body.sort_order != null && (!Number.isInteger(body.sort_order) || body.sort_order < 0)) return "Ordem inválida";
+  if (body.visible != null && typeof body.visible !== "boolean") return "Visibilidade inválida";
+  if (typeof body.url === "string" && body.url && !isValidUrl(body.url)) return "URL inválida — protocolos permitidos: http, https, mailto, tel";
   return null;
+}
+
+function validId(value: unknown): value is number {
+  return Number.isInteger(value) && value > 0;
+}
+
+function cleanOptionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 async function verifyToken(req: Request): Promise<boolean> {
@@ -66,9 +97,12 @@ async function verifyToken(req: Request): Promise<boolean> {
     const valid = await crypto.subtle.verify("HMAC", key, signature, enc.encode(signingInput));
     if (!valid) return false;
 
-    // Check expiry
+    const header = JSON.parse(new TextDecoder().decode(base64urlDecode(parts[0])));
+    if (header.alg !== "HS256" || header.typ !== "JWT") return false;
+
     const payload = JSON.parse(new TextDecoder().decode(base64urlDecode(parts[1])));
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return false;
+    if (typeof payload.exp !== "number" || payload.exp < Math.floor(Date.now() / 1000)) return false;
+    if (typeof payload.sub !== "string" || !payload.sub) return false;
 
     return true;
   } catch {
@@ -83,10 +117,7 @@ Deno.serve(async (req) => {
 
   const authenticated = await verifyToken(req);
   if (!authenticated) {
-    return new Response(
-      JSON.stringify({ error: "Não autorizado" }),
-      { status: 401, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
-    );
+    return jsonResponse(req, { error: "Não autorizado" }, 401);
   }
 
   const supabase = createClient(
@@ -98,6 +129,7 @@ Deno.serve(async (req) => {
     if (req.method === "GET") {
       const url = new URL(req.url);
       const page = url.searchParams.get("page");
+      if (page && !VALID_PAGES.includes(page)) return jsonResponse(req, { error: "Página inválida" }, 400);
       let query = supabase.from("cards").select("*").order("sort_order", { ascending: true });
       if (page) query = query.eq("page", page);
       const { data, error } = await query;
@@ -108,18 +140,17 @@ Deno.serve(async (req) => {
     }
 
     if (req.method === "POST") {
-      const body = await req.json();
+      const body = await readJsonObject(req);
+      if (!body) return jsonResponse(req, { error: "JSON inválido" }, 400);
       const validationError = validateCardBody(body);
       if (validationError) {
-        return new Response(JSON.stringify({ error: validationError }), {
-          status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
-        });
+        return jsonResponse(req, { error: validationError }, 400);
       }
       const { data, error } = await supabase.from("cards").insert({
-        page: body.page, icon: body.icon || null, title: body.title,
-        description: body.description || null, url: body.url || null,
-        link_type: body.link_type || "external", gate_source: body.gate_source || null,
-        status: body.status || null, highlight: body.highlight || null,
+        page: body.page, icon: cleanOptionalString(body.icon), title: (body.title as string).trim(),
+        description: cleanOptionalString(body.description), url: cleanOptionalString(body.url),
+        link_type: body.link_type || "external", gate_source: cleanOptionalString(body.gate_source),
+        status: cleanOptionalString(body.status), highlight: cleanOptionalString(body.highlight),
         sort_order: body.sort_order || 0, visible: body.visible !== false,
       }).select().single();
       if (error) throw error;
@@ -129,23 +160,20 @@ Deno.serve(async (req) => {
     }
 
     if (req.method === "PUT") {
-      const body = await req.json();
-      if (!body.id) {
-        return new Response(JSON.stringify({ error: "ID é obrigatório" }), {
-          status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
-        });
+      const body = await readJsonObject(req);
+      if (!body) return jsonResponse(req, { error: "JSON inválido" }, 400);
+      if (!validId(body.id)) {
+        return jsonResponse(req, { error: "ID é obrigatório" }, 400);
       }
       const validationError = validateCardBody(body);
       if (validationError) {
-        return new Response(JSON.stringify({ error: validationError }), {
-          status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
-        });
+        return jsonResponse(req, { error: validationError }, 400);
       }
       const { data, error } = await supabase.from("cards").update({
-        page: body.page, icon: body.icon || null, title: body.title,
-        description: body.description || null, url: body.url || null,
-        link_type: body.link_type || "external", gate_source: body.gate_source || null,
-        status: body.status || null, highlight: body.highlight || null,
+        page: body.page, icon: cleanOptionalString(body.icon), title: (body.title as string).trim(),
+        description: cleanOptionalString(body.description), url: cleanOptionalString(body.url),
+        link_type: body.link_type || "external", gate_source: cleanOptionalString(body.gate_source),
+        status: cleanOptionalString(body.status), highlight: cleanOptionalString(body.highlight),
         sort_order: body.sort_order || 0, visible: body.visible !== false,
         updated_at: new Date().toISOString(),
       }).eq("id", body.id).select().single();
@@ -156,11 +184,10 @@ Deno.serve(async (req) => {
     }
 
     if (req.method === "DELETE") {
-      const body = await req.json();
-      if (!body.id) {
-        return new Response(JSON.stringify({ error: "ID é obrigatório" }), {
-          status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
-        });
+      const body = await readJsonObject(req);
+      if (!body) return jsonResponse(req, { error: "JSON inválido" }, 400);
+      if (!validId(body.id)) {
+        return jsonResponse(req, { error: "ID é obrigatório" }, 400);
       }
       const { error } = await supabase.from("cards").delete().eq("id", body.id);
       if (error) throw error;
